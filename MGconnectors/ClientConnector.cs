@@ -15,6 +15,7 @@ namespace MGconnectors
         private UdpClient broadcastingClient;
         private receivingDelegate receivingFunc;
         private bool needToStop = false;
+        private SynchronizationContext context;
 
         public delegate void receivingDelegate();
 
@@ -65,11 +66,11 @@ namespace MGconnectors
                 System.Console.WriteLine(e);
             }
 
-            SynchronizationContext current = SynchronizationContext.Current;
-            Task.Factory.StartNew( () => tryToReceiveIP(broadcastIp, current), new CancellationToken() );
+            context = SynchronizationContext.Current;
+            Task.Factory.StartNew( () => tryToReceiveIP(broadcastIp), new CancellationToken() );
         }
 
-        void tryToReceiveIP(System.Net.IPAddress broadcastIp, SynchronizationContext context)
+        void tryToReceiveIP(System.Net.IPAddress broadcastIp)
         {
             while (!isConnected() && !needToStop)
             {
@@ -79,10 +80,6 @@ namespace MGconnectors
                 Thread.Sleep(5000);
                 if (!isConnected()) broadcastingClient.Close();
             }
-
-            if (isConnected()) context.Post((unused) => receivingFunc(), new object());
-
-
         }
 
         private void getServerIp(IAsyncResult answer)
@@ -96,7 +93,8 @@ namespace MGconnectors
 
         private void connect(System.Net.IPAddress serverIp)
         {
-            clientSocket.Connect(serverIp, 10407);           
+            clientSocket.Connect(serverIp, 10407);
+            if (isConnected()) context.Post((unused) => receivingFunc(), new object());
         }
     }
 }
