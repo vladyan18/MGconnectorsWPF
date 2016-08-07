@@ -14,6 +14,7 @@ namespace MGconnectors
         private TcpClient clientSocket = new TcpClient();
         private UdpClient broadcastingClient;
         private receivingDelegate receivingFunc;
+        private bool needToStop = false;
 
         public delegate void receivingDelegate();
 
@@ -34,19 +35,43 @@ namespace MGconnectors
             return (clientSocket.Connected);
         }
 
+        public void stopTrying()
+        {
+            needToStop = true;
+        }
+
         public void startConnecting(receivingDelegate receivingFunc)
         {
             this.receivingFunc = receivingFunc;
+            needToStop = false;
             string hostName = System.Net.Dns.GetHostName();
-            System.Net.IPAddress broadcastIp = System.Net.Dns.GetHostEntry(hostName).AddressList[2];
-            string strIp = broadcastIp.ToString();
-            broadcastIp = System.Net.IPAddress.Parse(strIp.Substring(0, strIp.LastIndexOf(".") + 1) + 255);
-            new Thread(() => tryToReceiveIP(broadcastIp)).Start();
+
+            System.Net.IPAddress broadcastIp = null;
+            foreach (System.Net.IPAddress cur in System.Net.Dns.GetHostEntry(hostName).AddressList)
+            {
+                if ((cur.ToString()).StartsWith("192"))
+                {
+                    broadcastIp = cur;
+                    break;
+                }
+            }
+            try
+            {
+                string strIp = broadcastIp.ToString();
+                broadcastIp = System.Net.IPAddress.Parse(strIp.Substring(0, strIp.LastIndexOf(".") + 1) + 255);
+            }
+            catch(Exception e)
+            {
+                System.Console.WriteLine(e);
+            }
+
+            SynchronizationContext current = SynchronizationContext.Current;
+            Task.Factory.StartNew( () => tryToReceiveIP(broadcastIp, current), new CancellationToken() );
         }
 
-        void tryToReceiveIP(System.Net.IPAddress broadcastIp)
+        void tryToReceiveIP(System.Net.IPAddress broadcastIp, SynchronizationContext context)
         {
-            while (!isConnected())
+            while (!isConnected() && !needToStop)
             {
                 byte[] bytes = Encoding.ASCII.GetBytes("Hello");
                 broadcastingClient.Send(bytes, bytes.Length, new System.Net.IPEndPoint(broadcastIp, 10408));
@@ -54,6 +79,10 @@ namespace MGconnectors
                 Thread.Sleep(5000);
                 if (!isConnected()) broadcastingClient.Close();
             }
+
+            if (isConnected()) context.Post((unused) => receivingFunc.DynamicInvoke(), new object());
+
+
         }
 
         private void getServerIp(IAsyncResult answer)
@@ -67,8 +96,7 @@ namespace MGconnectors
 
         private void connect(System.Net.IPAddress serverIp)
         {
-            clientSocket.Connect(serverIp, 10407);
-            if (isConnected()) receivingFunc.DynamicInvoke();
+            clientSocket.Connect(serverIp, 10407);           
         }
     }
 }
