@@ -80,7 +80,7 @@ namespace MGconnectors
                 if (!isConnected()) broadcastingClient.Close();
             }
 
-            if (isConnected()) context.Post((unused) => receivingFunc.DynamicInvoke(), new object());
+            if (isConnected()) context.Post((unused) => receivingFunc(), new object());
 
 
         }
