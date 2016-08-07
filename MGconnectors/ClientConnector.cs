@@ -13,11 +13,11 @@ namespace MGconnectors
 
         private TcpClient clientSocket = new TcpClient();
         private UdpClient broadcastingClient;
-        private receivingDelegate receivingFunc;
+        private ConnectedDelegate receivingFunc;
         private bool needToStop = false;
         private SynchronizationContext context;
 
-        public delegate void receivingDelegate();
+        public delegate void ConnectedDelegate(TcpClient socket);
 
         public ClientConnector()
         {
@@ -41,7 +41,7 @@ namespace MGconnectors
             needToStop = true;
         }
 
-        public void startConnecting(receivingDelegate receivingFunc)
+        public void startConnecting(ConnectedDelegate receivingFunc)
         {
             this.receivingFunc = receivingFunc;
             needToStop = false;
@@ -94,7 +94,7 @@ namespace MGconnectors
         private void connect(System.Net.IPAddress serverIp)
         {
             clientSocket.Connect(serverIp, 10407);
-            if (isConnected()) context.Post((unused) => receivingFunc(), new object());
+            if (isConnected()) context.Post((unused) => receivingFunc(clientSocket), new object());
         }
     }
 }
