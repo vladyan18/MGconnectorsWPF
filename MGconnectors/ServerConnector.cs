@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace MGconnectors
 {
-    class ServerConnector
+    public class ServerConnector
     {
         private TcpListener serverListener;
         private UdpClient broadcastingClient = new UdpClient(10408);

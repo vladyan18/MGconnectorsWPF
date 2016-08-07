@@ -67,28 +67,36 @@ namespace MGconnectors
             }
 
             context = SynchronizationContext.Current;
-            Task.Factory.StartNew( () => tryToReceiveIP(broadcastIp), new CancellationToken() );
+            Task.Factory.StartNew( () => tryToReceiveIP(broadcastIp));
         }
 
         void tryToReceiveIP(System.Net.IPAddress broadcastIp)
         {
+            
             while (!isConnected() && !needToStop)
             {
+                broadcastingClient.Client.ReceiveTimeout = 5000;
+
                 byte[] bytes = Encoding.ASCII.GetBytes("Hello");
                 broadcastingClient.Send(bytes, bytes.Length, new System.Net.IPEndPoint(broadcastIp, 10408));
-                broadcastingClient.BeginReceive(getServerIp, new object());
-                Thread.Sleep(5000);
-                if (!isConnected()) broadcastingClient.Close();
+
+                System.Net.IPEndPoint ip = new System.Net.IPEndPoint(System.Net.IPAddress.Any, 10406);
+
+                try
+                {
+                    byte[] inBytes = broadcastingClient.Receive(ref ip);
+
+                    if (inBytes != null)
+                    {
+                        System.Net.IPAddress serverIp = System.Net.IPAddress.Parse(Encoding.ASCII.GetString(inBytes));
+                        connect(serverIp);
+                    }
+                }
+                catch(SocketException e)
+                {
+                    System.Console.WriteLine("Не удалось подключиться");
+                }
             }
-        }
-
-        private void getServerIp(IAsyncResult answer)
-        {
-            System.Net.IPEndPoint ip = new System.Net.IPEndPoint(System.Net.IPAddress.Any, 10406);
-            byte[] bytes = broadcastingClient.EndReceive(answer, ref ip);
-            System.Net.IPAddress serverIp = System.Net.IPAddress.Parse(Encoding.ASCII.GetString(bytes));
-
-            connect(serverIp);
         }
 
         private void connect(System.Net.IPAddress serverIp)
